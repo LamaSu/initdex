@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>initdex: catch the people you meet at init()</title>
+<meta name="description" content="initdex turns the WorkOS init() badge (M5Stack StopWatch) into a catch-the-people-you-meet game, with an agent pack so your AI agent can help you network and follow up.">
+<link rel="alternate" type="text/markdown" href="SKILL.md" title="initdex agent skill">
+<style>
+:root { --bg:#08080d; --panel:#13131c; --line:#2a2a3a; --ink:#f3f3f7; --muted:#a6a6bb; --yellow:#ffd23f; --blue:#4fb3ff; --red:#ff4f61; --green:#3ddc84; }
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--ink); font: 18px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { margin: 0; }
+header, main, footer { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+a { color: var(--blue); }
+h1 { font-size: 2.7rem; line-height: 1.1; margin: 0; letter-spacing: -.02em; }
+h1 small { display: block; font-size: 1.25rem; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-top: .35em; }
+h2 { font-size: 1.35rem; margin: 0 0 .5em; }
+code, pre, textarea, input, select { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.hero { display: grid; grid-template-columns: auto 1fr; gap: 32px; align-items: center; padding-top: 44px; padding-bottom: 8px; }
+.badge { position: relative; width: 190px; height: 190px; border-radius: 50%; background: #000; border: 10px solid #2b2b37; box-shadow: 0 0 46px rgba(255,79,97,.28); }
+.ball { position: absolute; inset: 20px; border-radius: 50%; background: linear-gradient(var(--red) 0 46%, #0c0c0f 46% 54%, #f2f2f5 54% 100%); }
+.ball::after { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border-radius: 50%; background: #f2f2f5; border: 9px solid #0c0c0f; }
+.key { position: absolute; top: 6px; width: 30px; height: 13px; border-radius: 7px; }
+.key.a { left: -6px; background: var(--yellow); transform: rotate(-45deg); }
+.key.b { right: -6px; background: var(--blue); transform: rotate(45deg); }
+.how { margin: 1em 0 .4em; padding-left: 1.3em; }
+.how li { margin: .15em 0; }
+.ka { color: var(--yellow); font-weight: 700; }
+nav { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 14px 0 4px; font-size: .9rem; }
+nav a { color: var(--muted); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 22px 24px; margin: 22px 0; }
+.fine { color: var(--muted); font-size: .88rem; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: .7em 0; }
+button { font: inherit; font-size: .95rem; padding: .55em 1.1em; border-radius: 999px; border: 1px solid var(--line); background: #1f1f2c; color: var(--ink); cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button.primary { background: var(--yellow); color: #111; border-color: var(--yellow); font-weight: 700; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+progress { width: 100%; height: 14px; accent-color: var(--green); margin-top: .6em; }
+.status { min-height: 1.5em; margin: .5em 0 0; }
+.status[data-kind="error"] { color: var(--red); }
+.status[data-kind="ok"] { color: var(--green); }
+.warn { border: 1px solid var(--red); border-radius: 14px; padding: .6em .9em; color: #ffd0d5; }
+textarea, input, select { width: 100%; font-size: .95rem; color: var(--ink); background: #0c0c13; border: 1px solid var(--line); border-radius: 12px; padding: .55em .7em; }
+textarea { resize: vertical; }
+pre { white-space: pre-wrap; word-break: break-word; background: #0c0c13; border: 1px solid var(--line); border-radius: 12px; padding: .7em .9em; margin: .5em 0; font-size: .9rem; }
+form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+form label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
+form .full { grid-column: 1 / -1; }
+.count { font-size: 2.2rem; font-weight: 800; margin: .2em 0 0; }
+.count span { color: var(--yellow); }
+.dex { list-style: none; padding: 0; margin: .8em 0; display: grid; gap: 8px; }
+.dex li { border: 1px solid var(--line); border-radius: 14px; padding: .55em .9em; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.dex .who { font-weight: 700; }
+.dex .co, .dex .when { color: var(--muted); font-size: .9rem; }
+.dex .when { margin-left: auto; }
+footer { color: var(--muted); font-size: .88rem; padding-bottom: 48px; }
+@media (max-width: 640px) { .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; } form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="hero">
+    <div class="badge" aria-hidden="true"><span class="key a"></span><span class="key b"></span><div class="ball"></div></div>
+    <div>
+      <h1>initdex <small>catch the people you meet at init()</small></h1>
+      <ol class="how">
+        <li>Hold badges close.</li>
+        <li>Both press <span class="ka">KEY A</span> (yellow, upper left) within 6 seconds.</li>
+        <li>Gotcha! They're in your Dex.</li>
+      </ol>
+      <p>Your catches stay on your badge; your agent helps you follow up.</p>
+    </div>
+  </div>
+  <nav aria-label="Sections">
+    <a href="#install">Install</a><a href="#dex">Your initdex</a><a href="#wanted">Wanted list</a><a href="#profile">Set my name</a><a href="#restore">Back to init()</a><a href="#agents">For agents</a>
+  </nav>
+</header>
+
+<main>
+  <p class="warn" id="no-serial" hidden>This browser can't talk to USB devices, so Install and Connect won't work here. Open this page in desktop Chrome or Edge, or have your coding agent install initdex for you (see <a href="#agents">For agents</a>).</p>
+
+  <section id="install" class="card">
+    <h2>Install initdex</h2>
+    <ol>
+      <li>Plug the badge into this computer with a USB-C <b>data</b> cable (charge-only cables won't work).</li>
+      <li>Hold <b>PWR</b> for about 2 seconds until the green LED lights, then release. The badge is now in download mode.</li>
+      <li>Click <b>Install initdex</b> and pick the badge in the list (usually "USB JTAG/serial debug unit").</li>
+    </ol>
+    <div class="row"><button id="install-btn" class="primary">Install initdex</button></div>
+    <progress id="install-progress" max="100" value="0"></progress>
+    <p id="install-status" class="status" role="status" aria-live="polite"></p>
+    <details id="install-layout" hidden><summary class="fine">Partition table read from your badge</summary><pre id="install-table"></pre></details>
+    <p class="fine">The installer writes exactly two things: initdex into the spare app slot (app1, 0x310000) and the 8 KB boot selector (otadata, 0xe000). Your init() firmware (app0) and your profile and photo (ffat) are never written. It reads the badge's partition table first and stops without writing anything if the layout isn't the init() conference layout. Installing downloads the firmware from this site and the esptool-js flasher from unpkg.com.</p>
+  </section>
+
+  <section id="dex" class="card">
+    <h2>Your initdex</h2>
+    <p>With the badge running initdex (it starts right after install), plug it in and connect. No download mode needed.</p>
+    <div class="row">
+      <button id="connect-btn" class="primary">Connect to badge</button>
+      <button id="refresh-btn" disabled>Refresh</button>
+      <label class="fine"><input type="checkbox" id="all-ports" style="width:auto"> show every serial port</label>
+    </div>
+    <p id="badge-status" class="status" role="status" aria-live="polite"></p>
+    <div id="me-box" hidden>
+      <p class="count">Caught <span id="caught-count">0</span></p>
+      <p id="me-line" class="fine"></p>
+    </div>
+    <ul id="dex-list" class="dex"></ul>
+    <div class="row"><button id="copy-agent-btn" disabled>Copy for your agent</button><span class="fine">Works pasted into any agent: Claude, ChatGPT, Grok, Muse, Dot, Instinct, and others.</span></div>
+    <textarea id="agent-text" rows="9" readonly hidden aria-label="Text copied for your agent"></textarea>
+  </section>
+
+  <section id="wanted" class="card">
+    <h2>Wanted list</h2>
+    <p>Your badge buzzes "A wild &lt;name&gt; appeared!" when someone on this list is nearby running initdex. Ask your agent who to look for, paste its answer below, and send it to the badge.</p>
+    <div class="row"><button id="copy-wanted-prompt">Copy prompt for your agent</button></div>
+    <textarea id="wanted-prompt" rows="5" readonly hidden aria-label="Prompt for your agent"></textarea>
+    <textarea id="wanted-names" rows="7" placeholder="One name per line, exactly as shown on their badge (up to 24)" aria-label="Wanted names"></textarea>
+    <div class="row"><button id="send-wanted" disabled>Send to badge</button><span class="fine">Connect to your badge first.</span></div>
+    <p id="wanted-status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="profile" class="card">
+    <h2>Set my name</h2>
+    <p>initdex shares the name, company and handle from your init() badge profile. If yours was never set up, fill this in so people can catch you.</p>
+    <form id="profile-form">
+      <label>Name <input name="name" maxlength="39" required autocomplete="name"></label>
+      <label>Company <input name="company" maxlength="31" autocomplete="organization"></label>
+      <label>Network
+        <select name="net">
+          <option value="github">GitHub</option><option value="x">X</option><option value="linkedin">LinkedIn</option>
+          <option value="huggingface">Hugging Face</option><option value="youtube">YouTube</option><option value="url">Other (URL)</option><option value="">None</option>
+        </select>
+      </label>
+      <label>Handle <input name="handle" maxlength="47" placeholder="username, no @" autocomplete="off"></label>
+      <div class="full row"><button id="profile-btn" type="submit" disabled>Save to badge</button></div>
+    </form>
+    <p id="profile-status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="restore" class="card">
+    <h2>Back to the init() badge</h2>
+    <p>Restarts the badge into the original init() conference firmware. Your catches stay stored on the badge; run Install again whenever you want initdex back.</p>
+    <div class="row"><button id="boot-init-btn" disabled>Back to the init() badge</button></div>
+    <p id="restore-status" class="status" role="status" aria-live="polite"></p>
+    <p class="fine">Badge not answering? WorkOS's installer at <a href="https://workos.com/init/badge/install">workos.com/init/badge/install</a> restores the official firmware.</p>
+  </section>
+
+  <section id="agents" class="card">
+    <h2>For agents</h2>
+    <p>Give your agent this line:</p>
+    <pre id="agent-oneliner">Read https://lamasu.github.io/initdex/SKILL.md and set up initdex on my init() badge, then help me network.</pre>
+    <div class="row"><button id="copy-oneliner">Copy</button></div>
+    <p><a href="SKILL.md">SKILL.md</a> (install, USB protocol, networking workflow) · <a href="llms.txt">llms.txt</a> · <a href="check_layout.py">check_layout.py</a> · firmware: <a href="firmware/initdex.bin">initdex.bin</a>, <a href="firmware/otadata-ota1.bin">otadata-ota1.bin</a></p>
+  </section>
+</main>
+
+<footer>
+  <p><b>Privacy.</b> While initdex runs, your badge continuously broadcasts the name, company and handle from your init() profile over ESP-NOW to other initdex badges within radio range; that is how the "nearby" radar works. A catch is saved to your Dex only when both people press KEY A within 6 seconds with badges close. Nothing is sent to any server: this page talks to your badge only over local USB, and the copy buttons only put text on your clipboard.</p>
+  <p>initdex is an unofficial fan project for the WorkOS init() badge.</p>
+</footer>
+
+<script type="module">
+// ==pure-begin== (environment-independent helpers; tools/test_page.mjs extracts and tests this block)
+const MD5_S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+const MD5_K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0);
+
+// MD5 (RFC 1321) of a Uint8Array, as lowercase hex. Used to verify flash reads and writes.
+function md5hex(input) {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const n = bytes.length;
+  const padded = new Uint8Array((((n + 8) >>> 6) + 1) * 64);
+  padded.set(bytes);
+  padded[n] = 0x80;
+  const dv = new DataView(padded.buffer);
+  dv.setUint32(padded.length - 8, (n * 8) >>> 0, true);
+  dv.setUint32(padded.length - 4, Math.floor(n / 0x20000000), true);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  const M = new Uint32Array(16);
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let j = 0; j < 16; j++) M[j] = dv.getUint32(off + j * 4, true);
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) & 15; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) & 15; }
+      else { F = C ^ (B | ~D); g = (7 * i) & 15; }
+      F = (F + A + MD5_K[i] + M[g]) | 0;
+      A = D; D = C; C = B;
+      const s = MD5_S[(i >> 4) * 4 + (i & 3)];
+      B = (B + ((F << s) | (F >>> (32 - s)))) | 0;
+    }
+    a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+  }
+  const out = new DataView(new ArrayBuffer(16));
+  out.setUint32(0, a0, true); out.setUint32(4, b0, true); out.setUint32(8, c0, true); out.setUint32(12, d0, true);
+  return hex(new Uint8Array(out.buffer));
+}
+function hex(bytes) { return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join(""); }
+
+const OTADATA = { offset: 0xe000, size: 0x2000 };
+const APP1 = { offset: 0x310000, size: 0x300000 };
+
+// ESP-IDF partition table: 32-byte entries (aa 50, type, subtype, offset u32le, size u32le,
+// label[16], flags u32le), ended by an all-0xFF entry or an MD5 entry (eb eb ...).
+function parsePartitions(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const entries = [];
+  for (let off = 0; off + 32 <= bytes.length; off += 32) {
+    const rec = bytes.subarray(off, off + 32);
+    if (rec.every(b => b === 0xff)) return { entries, md5ok: null };
+    if (rec[0] === 0xeb && rec[1] === 0xeb) return { entries, md5ok: hex(rec.subarray(16, 32)) === md5hex(bytes.subarray(0, off)) };
+    if (rec[0] !== 0xaa || rec[1] !== 0x50) throw new Error(`This doesn't look like an ESP-IDF partition table (entry ${entries.length + 1}).`);
+    const raw = rec.subarray(12, 28);
+    const end = raw.indexOf(0);
+    entries.push({
+      label: String.fromCharCode(...raw.subarray(0, end < 0 ? 16 : end)),
+      type: rec[2], subtype: rec[3],
+      offset: dv.getUint32(off + 4, true), size: dv.getUint32(off + 8, true), flags: dv.getUint32(off + 28, true),
+    });
+  }
+  throw new Error("The partition table has no end marker.");
+}
+
+// Same rule as tools/check_layout.py: otadata at 0xe000 (0x2000), one ota_1 app at
+// 0x310000 (0x300000), nothing else overlapping them, checksum OK if present.
+function layoutProblems(entries, md5ok) {
+  const problems = [];
+  if (md5ok === false) problems.push("the partition table checksum does not match");
+  const otadata = entries.filter(e => e.type === 1 && e.subtype === 0x00);
+  const app1 = entries.filter(e => e.type === 0 && e.subtype === 0x11);
+  if (otadata.length !== 1) problems.push(`expected one otadata partition, found ${otadata.length}`);
+  else if (otadata[0].offset !== OTADATA.offset || otadata[0].size !== OTADATA.size)
+    problems.push(`otadata is at 0x${otadata[0].offset.toString(16)} (size 0x${otadata[0].size.toString(16)}), expected 0xe000 (0x2000)`);
+  if (app1.length !== 1) problems.push(`expected one ota_1 app partition, found ${app1.length}`);
+  else if (app1[0].offset !== APP1.offset || app1[0].size !== APP1.size)
+    problems.push(`ota_1 is at 0x${app1[0].offset.toString(16)} (size 0x${app1[0].size.toString(16)}), expected 0x310000 (0x300000)`);
+  const hits = (e, r) => e.offset < r.offset + r.size && r.offset < e.offset + e.size;
+  for (const e of entries) {
+    if (otadata.includes(e) || app1.includes(e)) continue;
+    if (hits(e, OTADATA)) problems.push(`partition "${e.label}" overlaps otadata`);
+    if (hits(e, APP1)) problems.push(`partition "${e.label}" overlaps the app1 slot`);
+  }
+  return problems;
+}
+function describePartition(e) {
+  const kind = e.type === 0 ? "app " : e.type === 1 ? "data" : `0x${e.type.toString(16)}`;
+  return `${e.label.padEnd(10)} ${kind} sub 0x${e.subtype.toString(16).padStart(2, "0")}  offset 0x${e.offset.toString(16).padStart(6, "0")}  size 0x${e.size.toString(16).padStart(6, "0")}`;
+}
+
+function appImageProblem(bytes) {
+  if (!bytes.length) return "initdex.bin is empty.";
+  if (bytes.length > APP1.size) return "initdex.bin is larger than the app1 slot.";
+  if (bytes[0] !== 0xe9 || bytes.length < 24) return "initdex.bin is not an ESP32 app image.";
+  if ((bytes[12] | (bytes[13] << 8)) !== 9) return "initdex.bin is not built for the ESP32-S3.";
+  return null;
+}
+// Which app slot an otadata image boots: the highest valid ota_seq wins, slot = (seq - 1) % 2.
+function otadataSlot(bytes) {
+  if (bytes.length !== OTADATA.size) return -1;
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let best = 0;
+  for (const off of [0, 0x1000]) {
+    const seq = dv.getUint32(off, true);
+    if (seq !== 0xffffffff && seq > best) best = seq;
+  }
+  return best ? (best - 1) % 2 : -1;
+}
+// ESP32-S3 GET_SECURITY_INFO: flags u32, flash_crypt_cnt u8, key purposes[7], chip_id u32, ...
+function securityProblem(info) {
+  if (!(info instanceof Uint8Array) || info.length < 16) return "Could not read the chip's security settings.";
+  const dv = new DataView(info.buffer, info.byteOffset, info.byteLength);
+  const flags = dv.getUint32(0, true);
+  let cryptBits = 0;
+  for (let v = info[4]; v; v >>= 1) cryptBits += v & 1;
+  if (dv.getUint32(12, true) !== 9) return "This chip is not an ESP32-S3.";
+  if (flags & 0x1) return "Secure boot is enabled on this chip, so initdex can't be installed.";
+  if (flags & 0x4) return "This chip is in secure download mode, so initdex can't be installed.";
+  if (cryptBits % 2) return "Flash encryption is enabled on this chip, so initdex can't be installed.";
+  return null;
+}
+
+const PROFILE_BASE = { github: "https://github.com/", x: "https://x.com/", linkedin: "https://www.linkedin.com/in/",
+  huggingface: "https://huggingface.co/", youtube: "https://www.youtube.com/@" };
+const NET_ALIAS = { twitter: "x", "hugging face": "huggingface", hf: "huggingface" };
+function str(v) { return typeof v === "string" ? v : ""; }
+function normNet(net) { const n = str(net).trim().toLowerCase(); return NET_ALIAS[n] || n; }
+function cleanHandle(net, handle) {
+  let h = str(handle).trim().replace(/^@+/, "");
+  if (normNet(net) === "linkedin") h = h.replace(/^in\//i, "");
+  return h.replace(/\/+$/, "");
+}
+function profileUrl(net, handle) {
+  const n = normNet(net), base = PROFILE_BASE[n], h = cleanHandle(n, handle);
+  if (!base || !h || /[\s/?#\\]/.test(h)) return null;
+  return base + encodeURIComponent(h);
+}
+function utf8Trim(s, maxBytes) {
+  const enc = new TextEncoder();
+  let out = str(s);
+  while (enc.encode(out).length > maxBytes) out = out.slice(0, -1);
+  return out;
+}
+// One name per line; strips list bullets/numbers an agent may add; dedupes; badge holds 24 names of <= 39 bytes.
+function cleanNames(text, max = 24) {
+  const seen = new Set(), names = [];
+  let dropped = 0;
+  for (const raw of str(text).split(/\r?\n/)) {
+    const line = utf8Trim(raw.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim(), 39).trim();
+    if (!line || seen.has(line.toLowerCase())) continue;
+    seen.add(line.toLowerCase());
+    if (names.length >= max) { dropped++; continue; }
+    names.push(line);
+  }
+  return { names, dropped };
+}
+
+const DEX_PROMPT = "These are the people I met (caught) at WorkOS init() / Developers After Dark, Oct 7-8 2026, via my badge. " +
+  "Using what you know about me, tell me who matters most and why, look up their public profiles from the handles, " +
+  "and draft a short, specific follow-up for each in my voice. Ask me before sending anything.";
+const WANTED_PROMPT = "I'm at WorkOS init() / Developers After Dark (Exploratorium, San Francisco, Oct 8 2026, until 9 PM) with my initdex badge. " +
+  "From the init() speakers/guest list you can see (for example https://luma.com/init-conf and https://luma.com/developers-after-dark), " +
+  "and using what you know about me, pick up to 10 people I should meet tonight, one name per line exactly as shown on their badge. " +
+  "Reply with only the names: no numbering, no extra text.";
+
+function dexForAgent(dex) {
+  return dex.map(c => {
+    const net = normNet(c.net);
+    const o = { name: str(c.name), company: str(c.company), net, handle: cleanHandle(net, c.handle) };
+    const url = profileUrl(net, c.handle);
+    if (url) o.profile = url;
+    if (Number(c.t) > 0) o.met_utc = new Date(Number(c.t) * 1000).toISOString();
+    return o;
+  });
+}
+function agentText(me, dex) {
+  const lines = [DEX_PROMPT, ""];
+  if (me && str(me.name)) lines.push("Me (from my badge): " + JSON.stringify({ name: str(me.name), company: str(me.company), net: normNet(me.net), handle: cleanHandle(me.net, me.handle) }), "");
+  lines.push(`My catches (${dex.length}), exported from my initdex badge:`, "```json", JSON.stringify(dexForAgent(dex), null, 2), "```", "",
+    "About initdex: https://lamasu.github.io/initdex/SKILL.md");
+  return lines.join("\n");
+}
+
+// Line-delimited JSON over the badge's USB serial. Replies carry "ok"; other lines
+// ({"event":...} and logs) never satisfy a command. One command in flight at a time.
+class BadgeLink {
+  constructor(port, onEvent = () => {}, onLost = () => {}) {
+    Object.assign(this, { port, onEvent, onLost, buf: "", waiters: [], queue: Promise.resolve(), closed: false });
+  }
+  async open(baudRate = 115200) {
+    await this.port.open({ baudRate });
+    this.reader = this.port.readable.getReader();
+    this.loopDone = this.loop();
+  }
+  async loop() {
+    const dec = new TextDecoder();
+    try {
+      for (;;) {
+        const { value, done } = await this.reader.read();
+        if (done) break;
+        this.buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = this.buf.search(/[\r\n]/)) >= 0) {
+          const line = this.buf.slice(0, i).trim();
+          this.buf = this.buf.slice(i + 1);
+          if (line) this.onLine(line);
+        }
+        if (this.buf.length > 200000) this.buf = "";
+      }
+    } catch { /* device lost or reader cancelled */ }
+    finally {
+      this.closed = true;
+      try { this.reader.releaseLock(); } catch { /* already released */ }
+      for (const w of this.waiters.splice(0)) { clearTimeout(w.timer); w.reject(new Error("The badge disconnected.")); }
+      if (!this.closing) this.onLost();
+    }
+  }
+  onLine(line) {
+    if (line[0] !== "{") return;
+    let msg;
+    try { msg = JSON.parse(line); } catch { return; }
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
+    if (!("ok" in msg)) { if (typeof msg.event === "string") this.onEvent(msg); return; }
+    const w = this.waiters.find(x => msg.ok !== true || x.accept(msg));
+    if (!w) return;
+    this.waiters.splice(this.waiters.indexOf(w), 1);
+    clearTimeout(w.timer);
+    w.resolve(msg);
+  }
+  send(command, timeoutMs = 4000, accept = () => true) {
+    const run = async () => {
+      if (this.closed) throw new Error("The badge is disconnected.");
+      let w;
+      const reply = new Promise((resolve, reject) => {
+        w = { accept, resolve, reject };
+        w.timer = setTimeout(() => {
+          const i = this.waiters.indexOf(w);
+          if (i >= 0) this.waiters.splice(i, 1);
+          reject(new Error(`The badge did not answer "${command.cmd}".`));
+        }, timeoutMs);
+      });
+      this.waiters.push(w);
+      let writer;
+      try {
+        writer = this.port.writable.getWriter();
+        await writer.write(new TextEncoder().encode(JSON.stringify(command) + "\n"));
+      } catch (error) {
+        clearTimeout(w.timer);
+        const i = this.waiters.indexOf(w);
+        if (i >= 0) this.waiters.splice(i, 1);
+        reply.catch(() => {});
+        throw new Error("Could not send to the badge: " + ((error && error.message) || error));
+      } finally { try { writer?.releaseLock(); } catch { /* ignore */ } }
+      const msg = await reply;
+      if (msg.ok !== true) throw new Error("The badge said: " + (str(msg.error) || "error"));
+      return msg;
+    };
+    const result = this.queue.then(run, run);
+    this.queue = result.catch(() => {});
+    return result;
+  }
+  async close() {
+    this.closing = true;
+    try { await this.reader?.cancel(); } catch { /* ignore */ }
+    try { await this.loopDone; } catch { /* ignore */ }
+    try { await this.port.close(); } catch { /* ignore */ }
+  }
+}
+// ==pure-end==
+
+const $ = id => document.getElementById(id);
+const ESPTOOL_URL = "https://unpkg.com/esptool-js@0.6.1/bundle.js";
+const ESPRESSIF_VID = 0x303a;
+const hasSerial = window.isSecureContext && "serial" in navigator;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+let installing = false, link = null, lastHello = null, lastDex = null, refreshTimer;
+
+function say(el, text, kind = "") { el.textContent = text; el.dataset.kind = kind; }
+function syncButtons() {
+  const on = !!link && !link.closed;
+  $("install-btn").disabled = !hasSerial || installing;
+  $("connect-btn").disabled = !hasSerial || installing;
+  $("connect-btn").textContent = on ? "Reconnect" : "Connect to badge";
+  for (const id of ["refresh-btn", "send-wanted", "profile-btn", "boot-init-btn"]) $(id).disabled = !on || installing;
+  $("copy-agent-btn").disabled = !lastDex;
+}
+async function copyText(text, box) {
+  if (box) { box.value = text; box.hidden = false; }
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { if (box) box.select(); return false; }
+}
+
+// ---------- install ----------
+async function fetchBin(path) {
+  const r = await fetch(path, { cache: "no-cache" });
+  if (!r.ok) throw new Error(`Couldn't download ${path} (HTTP ${r.status}).`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+async function readFlashChecked(loader, transport, offset, size) {
+  const bytes = await loader.readFlash(offset, size);
+  // esptool-js 0.6.1 leaves the stub's trailing MD5 packet unread; consume and check it
+  // before sending another command, or later replies would be misaligned.
+  const digest = await transport.read(3000);
+  if (!(bytes instanceof Uint8Array) || bytes.length !== size || !(digest instanceof Uint8Array) ||
+      digest.length !== 16 || hex(digest) !== md5hex(bytes))
+    throw new Error("Reading the partition table over USB failed its checksum. Unplug, replug and retry.");
+  return bytes;
+}
+async function install() {
+  if (!hasSerial || installing) return;
+  const status = $("install-status"), bar = $("install-progress");
+  const step = (text, pct) => { say(status, text); if (pct !== undefined) bar.value = pct; };
+  const esptool = import(ESPTOOL_URL);
+  esptool.catch(() => {});
+  let port;
+  try {
+    port = await navigator.serial.requestPort({ filters: [{ usbVendorId: ESPRESSIF_VID }] });
+  } catch (error) {
+    say(status, error.name === "NotFoundError" ? "Cancelled. Nothing was written." : error.message, error.name === "NotFoundError" ? "" : "error");
+    return;
+  }
+  installing = true; syncButtons();
+  $("install-layout").hidden = true;
+  let transport, loader, wrote = false;
+  try {
+    if (link) { await link.close(); link = null; }
+    step("Downloading initdex…", 3);
+    const [app, ota] = await Promise.all([fetchBin("firmware/initdex.bin"), fetchBin("firmware/otadata-ota1.bin")]);
+    const appProblem = appImageProblem(app);
+    if (appProblem) throw new Error(appProblem);
+    if (otadataSlot(ota) !== 1) throw new Error("otadata-ota1.bin does not select the app1 slot.");
+    let lib;
+    try { lib = await esptool; }
+    catch { throw new Error("Couldn't load the flasher library (esptool-js) from unpkg.com. Check your internet connection and retry."); }
+    step("Connecting to the badge…", 6);
+    transport = new lib.Transport(port, false);
+    loader = new lib.ESPLoader({ transport, baudrate: 115200, debugLogging: false,
+      terminal: { clean() {}, write() {}, writeLine() {} } });
+    await loader.detectChip("default_reset");
+    if (loader.chip.CHIP_NAME !== "ESP32-S3") throw new Error(`Found an ${loader.chip.CHIP_NAME}, not the badge's ESP32-S3.`);
+    const securityIssue = securityProblem(await loader.checkCommand("read security info", 0x14, new Uint8Array(), 0, 20, 3000));
+    if (securityIssue) throw new Error(securityIssue);
+    if (loader.chip.postConnect) await loader.chip.postConnect(loader);
+    await loader.runStub();
+    const flashSize = await loader.detectFlashSize();
+    if (flashSize !== "16MB") throw new Error(`Expected 16 MB of flash, found ${flashSize}.`);
+    step("Checking the partition table…", 12);
+    const { entries, md5ok } = parsePartitions(await readFlashChecked(loader, transport, 0x8000, 0x1000));
+    $("install-table").textContent = entries.map(describePartition).join("\n") + `\nchecksum: ${md5ok === null ? "absent" : md5ok ? "ok" : "MISMATCH"}`;
+    $("install-layout").hidden = false;
+    const problems = layoutProblems(entries, md5ok);
+    if (problems.length) throw new Error("This badge doesn't have the init() conference flash layout (" + problems.join("; ") + ").");
+    step("Writing initdex to app1. Keep the cable plugged in…", 15);
+    wrote = true;
+    await loader.writeFlash({
+      // app first, boot selector last: if anything fails, the badge still boots what it booted before.
+      fileArray: [{ data: app, address: APP1.offset }, { data: ota, address: OTADATA.offset }],
+      flashSize: "keep", flashMode: "keep", flashFreq: "keep", eraseAll: false, compress: true,
+      calculateMD5Hash: image => md5hex(image),
+      reportProgress(fileIndex, written, total) {
+        const sizes = [app.length, ota.length], done = fileIndex ? app.length : 0;
+        bar.value = 15 + ((done + (total ? written / total : 1) * sizes[fileIndex]) / (app.length + ota.length)) * 80;
+      },
+    });
+    step("Verified. Restarting into initdex…", 97);
+    await transport.setRTS(true); await sleep(100);
+    await loader.after("hard_reset");
+    bar.value = 100;
+    say(status, "Gotcha! initdex is installed and the badge is restarting into it. Hold badges close and both press KEY A to catch someone, then connect below to see your Dex.", "ok");
+  } catch (error) {
+    const message = (error && error.message) || String(error);
+    say(status, wrote
+      ? `The install stopped partway: ${message} Your init() firmware and profile were not touched. Put the badge back in download mode and click Install to retry.`
+      : `Stopped before writing anything: ${message}`, "error");
+  } finally {
+    if (transport) { try { await transport.disconnect(); } catch { /* ignore */ } }
+    installing = false; syncButtons();
+  }
+}
+
+// ---------- your initdex ----------
+function renderHello(hello) {
+  const me = hello.me || {};
+  $("me-box").hidden = false;
+  $("caught-count").textContent = String(Number(hello.caught) || 0);
+  const handle = cleanHandle(me.net, me.handle);
+  const from = { init: "from your init() profile", override: "set from this page", default: "default" }[str(hello.source)] || str(hello.source);
+  $("me-line").textContent = str(me.name)
+    ? `You: ${[str(me.name), str(me.company), handle && `@${handle}${me.net ? ` (${normNet(me.net)})` : ""}`].filter(Boolean).join(" · ")} (${from}). initdex ${str(hello.ver)}`
+    : "Your badge has no name yet. Set one below so people can catch you.";
+  const form = $("profile-form");
+  if (str(me.name) && !form.elements.name.value) {
+    form.elements.name.value = str(me.name);
+    form.elements.company.value = str(me.company);
+    if ([...form.elements.net.options].some(o => o.value === normNet(me.net))) form.elements.net.value = normNet(me.net);
+    form.elements.handle.value = handle;
+  }
+}
+function renderDex(dex) {
+  const list = $("dex-list");
+  list.replaceChildren();
+  $("caught-count").textContent = String(dex.length);
+  if (!dex.length) {
+    const li = document.createElement("li");
+    li.textContent = "No catches yet. Hold badges close and both press KEY A.";
+    list.append(li);
+    return;
+  }
+  for (const c of [...dex].reverse()) {
+    const li = document.createElement("li");
+    const who = document.createElement("span"); who.className = "who"; who.textContent = str(c.name) || "(no name)";
+    li.append(who);
+    if (str(c.company)) { const co = document.createElement("span"); co.className = "co"; co.textContent = str(c.company); li.append(co); }
+    const handle = cleanHandle(c.net, c.handle), url = profileUrl(c.net, c.handle);
+    if (handle) {
+      const h = document.createElement(url ? "a" : "span");
+      h.textContent = (url ? "@" : "") + handle + (c.net ? ` (${normNet(c.net)})` : "");
+      if (url) { h.href = url; h.target = "_blank"; h.rel = "noopener noreferrer"; }
+      li.append(h);
+    }
+    if (Number(c.t) > 0) {
+      const when = document.createElement("span"); when.className = "when";
+      when.textContent = new Date(Number(c.t) * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+      li.append(when);
+    }
+    list.append(li);
+  }
+}
+async function refreshDex() {
+  if (!link || link.closed) return;
+  try {
+    const hello = await link.send({ cmd: "hello" }, 4000, m => "app" in m);
+    const reply = await link.send({ cmd: "dex" }, 8000, m => Array.isArray(m.dex));
+    lastHello = hello; lastDex = reply.dex;
+    renderHello(hello); renderDex(reply.dex);
+  } catch (error) { say($("badge-status"), error.message, "error"); }
+  syncButtons();
+}
+function onBadgeEvent(ev) {
+  if (ev.event === "caught") { say($("badge-status"), `Gotcha! ${str(ev.name)}${ev.again ? " (again)" : ""}`, "ok"); clearTimeout(refreshTimer); refreshTimer = setTimeout(refreshDex, 500); }
+  else if (ev.event === "wild") say($("badge-status"), `A wild ${str(ev.name)} appeared!`, "ok");
+}
+async function connectBadge() {
+  if (!hasSerial || installing) return;
+  const status = $("badge-status");
+  let port;
+  try { port = await navigator.serial.requestPort($("all-ports").checked ? {} : { filters: [{ usbVendorId: ESPRESSIF_VID }] }); }
+  catch (error) { say(status, error.name === "NotFoundError" ? "No badge chosen." : error.message, error.name === "NotFoundError" ? "" : "error"); return; }
+  if (link) { await link.close(); link = null; syncButtons(); }
+  say(status, "Connecting…");
+  const l = new BadgeLink(port, onBadgeEvent, () => {
+    if (link === l) { link = null; say(status, "Badge disconnected.", ""); syncButtons(); }
+    port.close().catch(() => {});
+  });
+  try {
+    try { await l.open(); }
+    catch { throw new Error("Couldn't open the badge's serial port. Close other apps or tabs using it, then retry."); }
+    let hello = null;
+    for (let attempt = 0; attempt < 3 && !hello && !l.closed; attempt++) {
+      try { hello = await l.send({ cmd: "hello" }, 2500, m => "app" in m); } catch { /* the badge may still be starting */ }
+    }
+    if (!hello) throw new Error("No reply from initdex. Make sure the badge is running initdex (install it above), then unplug, replug and connect again.");
+    if (hello.app !== "initdex") throw new Error(`This badge is running "${str(hello.app)}", not initdex.`);
+    link = l; lastHello = hello;
+    say(status, `Connected to initdex ${str(hello.ver)}.`, "ok");
+    renderHello(hello);
+    syncButtons();
+    await refreshDex();
+  } catch (error) {
+    await l.close();
+    if (link === l) link = null;
+    say(status, error.message, "error");
+    syncButtons();
+  }
+}
+
+// ---------- wire up ----------
+$("install-btn").addEventListener("click", install);
+$("connect-btn").addEventListener("click", connectBadge);
+$("refresh-btn").addEventListener("click", refreshDex);
+$("copy-agent-btn").addEventListener("click", async () => {
+  if (!lastDex) return;
+  const ok = await copyText(agentText(lastHello && lastHello.me, lastDex), $("agent-text"));
+  $("copy-agent-btn").textContent = ok ? "Copied. Paste it into your agent" : "Select the text below and copy it";
+});
+$("copy-wanted-prompt").addEventListener("click", async () => {
+  const ok = await copyText(WANTED_PROMPT, $("wanted-prompt"));
+  $("copy-wanted-prompt").textContent = ok ? "Copied. Paste it into your agent" : "Select the prompt below and copy it";
+});
+$("copy-oneliner").addEventListener("click", async () => {
+  const ok = await copyText($("agent-oneliner").textContent);
+  $("copy-oneliner").textContent = ok ? "Copied" : "Select the line above and copy it";
+});
+$("send-wanted").addEventListener("click", async () => {
+  const status = $("wanted-status");
+  const { names, dropped } = cleanNames($("wanted-names").value);
+  if (!names.length) return say(status, "Add at least one name, one per line.", "error");
+  try {
+    const reply = await link.send({ cmd: "wanted", names }, 5000);
+    say(status, `Wanted list on your badge: ${Number.isInteger(reply.count) ? reply.count : names.length} name(s).` +
+      (dropped ? ` ${dropped} more skipped; the badge holds 24.` : ""), "ok");
+  } catch (error) { say(status, error.message, "error"); }
+});
+$("profile-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const status = $("profile-status"), f = event.target.elements;
+  const net = f.net.value;
+  const profile = { cmd: "set_profile", name: utf8Trim(f.name.value.trim(), 39), company: utf8Trim(f.company.value.trim(), 31),
+    net, handle: utf8Trim(cleanHandle(net, f.handle.value), 47) };
+  if (!profile.name) return say(status, "Name is required.", "error");
+  try {
+    await link.send(profile, 5000);
+    say(status, `Saved. People now catch you as ${profile.name}.`, "ok");
+    await refreshDex();
+  } catch (error) { say(status, error.message, "error"); }
+});
+$("boot-init-btn").addEventListener("click", async () => {
+  const status = $("restore-status");
+  if (!link || !confirm("Switch this badge back to the init() conference firmware? Your catches stay stored on the badge; run Install again to come back.")) return;
+  const l = link;
+  try {
+    await l.send({ cmd: "boot_init" }, 5000);
+    say(status, "Restarting into the init() badge firmware. You can unplug it once it restarts.", "ok");
+  } catch (error) {
+    say(status, l.closed ? "The badge disconnected, so it is probably restarting into init(). If it doesn't, use WorkOS's installer below." : error.message, l.closed ? "" : "error");
+  } finally {
+    if (link === l) link = null;
+    await l.close();
+    syncButtons();
+  }
+});
+window.addEventListener("beforeunload", event => { if (installing) { event.preventDefault(); event.returnValue = ""; } });
+$("no-serial").hidden = hasSerial;
+syncButtons();
+</script>
+</body>
+</html>
