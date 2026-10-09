@@ -1,0 +1,39 @@
+{
+  "app": "initdex",
+  "version": "0.1.0",
+  "chip": "esp32s3",
+  "board": "M5Stack StopWatch (init() badge)",
+  "install": [
+    {
+      "file": "initdex.bin",
+      "offset": "0x310000"
+    },
+    {
+      "file": "otadata-ota1.bin",
+      "offset": "0xe000"
+    }
+  ],
+  "restore_init": [
+    {
+      "file": "otadata-ota0.bin",
+      "offset": "0xe000"
+    }
+  ],
+  "files": {
+    "initdex.bin": {
+      "bytes": 1237584,
+      "sha256": "4f0bdd9c0fdb300a2746a2f058b992d37da182e00f37fc427329359f0cdc62ec",
+      "offset": "0x310000"
+    },
+    "otadata-ota1.bin": {
+      "bytes": 8192,
+      "sha256": "71678d8929e5fbe9562f7f7f0aa7c97496f53528af2d50adb5ce7378c5ff903b",
+      "offset": "0xe000"
+    },
+    "otadata-ota0.bin": {
+      "bytes": 8192,
+      "sha256": "4187e23640ddb4d9e00a91376d2df4aec3b0316e51b2f8f784bd43df49ce8ba9",
+      "offset": "0xe000"
+    }
+  }
+}

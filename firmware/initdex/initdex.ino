@@ -20,7 +20,7 @@
 static const char* PACK_URL = "https://lamasu.github.io/initdex/";
 static const uint8_t BCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static const uint8_t CHANNEL = 1;
-static const int RSSI_CATCH = -62;       // a throw must be this strong (badges close)
+static const int RSSI_CATCH = -66;       // a throw must be this strong (badges close)
 static const uint32_t THROW_MS = 6000;   // both press A inside this window
 static const uint32_t BEACON_MS = 1200;
 static const uint32_t NEARBY_MS = 15000;
@@ -588,7 +588,8 @@ static void drawThrow() {
 
 static void drawCelebrate() {
   char line[80];
-  text(celebAgain ? "Caught again!" : "Gotcha!", 110, &fonts::FreeSansBold24pt7b, TFT_YELLOW);
+  if (celebAgain) text("Caught again!", 110, &fonts::FreeSansBold18pt7b, TFT_YELLOW);
+  else text("Gotcha!", 110, &fonts::FreeSansBold24pt7b, TFT_YELLOW);
   text(celebCard.name, 198, &fonts::FreeSansBold18pt7b, TFT_WHITE);
   if (celebCard.company[0]) text(celebCard.company, 244, &fonts::FreeSans12pt7b, rgb(170, 170, 170));
   handleLine(celebCard, line, sizeof line);
@@ -809,8 +810,9 @@ static void handleSerial() {
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+  Serial.setTxBufferSize(4096);  // a full dex reply must not be dropped
+  Serial.setRxBufferSize(4096);
   Serial.begin(115200);
-  Serial.setTxTimeoutMs(0);
   M5.Display.setBrightness(150);
   W = M5.Display.width();
   H = M5.Display.height();
