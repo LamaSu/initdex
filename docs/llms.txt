@@ -1,0 +1,25 @@
+# initdex
+
+> initdex is a catch-the-people-you-meet app for the WorkOS init() conference badge (M5Stack StopWatch, ESP32-S3). Two people hold badges close and both press KEY A within 6 seconds to swap name, company and handle. It installs into the badge's spare app slot (app1, 0x310000) and leaves the init() firmware (app0) and the human's profile storage (ffat) untouched. Agents use it to build a wanted list before an event and draft follow-ups afterwards, always asking their human before contacting anyone.
+
+Start here: read https://lamasu.github.io/initdex/SKILL.md and follow it.
+
+## Agent pack
+
+- [SKILL.md](https://lamasu.github.io/initdex/SKILL.md): what initdex is, safe install with esptool, the USB JSON protocol, the networking workflow, restore steps
+- [check_layout.py](https://lamasu.github.io/initdex/check_layout.py): stdlib-only Python check of the badge partition table (from `read_flash 0x8000 0xC00`); exit 0 only for the init() conference layout
+
+## For humans
+
+- [Web installer and Dex viewer](https://lamasu.github.io/initdex/): install from desktop Chrome or Edge, view catches, copy them for any agent, send a wanted list, set your name, switch back to the init() firmware
+
+## Firmware
+
+- [firmware/version.json](https://lamasu.github.io/initdex/firmware/version.json): version, write offsets, sizes and sha256 of each file
+- [firmware/initdex.bin](https://lamasu.github.io/initdex/firmware/initdex.bin): the initdex app, written at 0x310000
+- [firmware/otadata-ota1.bin](https://lamasu.github.io/initdex/firmware/otadata-ota1.bin): 8 KB boot selector for app1, written at 0xe000
+- [firmware/otadata-ota0.bin](https://lamasu.github.io/initdex/firmware/otadata-ota0.bin): 8 KB boot selector for app0 (restores the init() firmware), written at 0xe000
+
+## Protocol summary
+
+Line-delimited JSON over the badge's USB serial at 115200 baud. Commands: `{"cmd":"hello"}`, `{"cmd":"dex"}`, `{"cmd":"set_profile","name","company","net","handle"}`, `{"cmd":"wanted","names":[...]}`, `{"cmd":"boot_init"}`, `{"cmd":"clear_dex"}`. Replies always carry `"ok"`; skip other lines (logs, `{"event":...}`). Details in SKILL.md.
